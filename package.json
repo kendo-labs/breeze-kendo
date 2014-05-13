@@ -1,0 +1,9 @@
+{
+    "dependencies": {
+        "express"         : "3.x",
+        "orm"             : "2.x",
+        "sqlite3"         : "2.1.x",
+        "breeze-mongodb"  : "",
+        "mongodb"         : ""
+    }
+}
