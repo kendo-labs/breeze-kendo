@@ -105,14 +105,13 @@
                 props.forEach(function(prop){
                     obj[prop.name] = rec[prop.name];
                 });
-                obj = new kendo.data.ObservableObject(obj);
+                obj = new kendo.data.Model(obj);
                 syncItems(obj, rec);
                 return obj;
             });
 
             a = new kendo.data.ObservableArray(a);
             a.bind("change", function(ev){
-                //console.log(ev);
                 switch (ev.action) {
                   case "remove":
                     ev.items.forEach(function(item){
@@ -170,7 +169,7 @@
                     nullable     : prop.isNullable,
                 };
             });
-            //schema.model = model;
+            schema.model = model;
             return schema;
         }
     });
@@ -191,7 +190,6 @@
         var protect = Mutex();
         observable.bind({
             "change": protect(function(ev){
-                console.log(ev);
                 if (ev.field) {
                     entity[ev.field] = observable[ev.field];
                 } else {
