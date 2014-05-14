@@ -19,7 +19,7 @@ var manager = new breeze.EntityManager({
 
 var dataSource = new kendo.data.breeze.Source({
     manager: manager,
-    query: breeze.EntityQuery.from("Customers"),
+    query: breeze.EntityQuery.from("Products"),
     serverSorting: true,
     serverPaging: true,
     serverFiltering: true,
@@ -27,10 +27,13 @@ var dataSource = new kendo.data.breeze.Source({
 });
 
 $("#grid").kendoGrid({
+    toolbar: ["create", "save", "cancel"],
     columns: [
-        { field: "CustomerID", width: 150 },
-        { field: "ContactName" },
-        { command: "destroy", width: 90 }
+        "ProductName",
+        { field: "UnitPrice", title: "Unit Price", format: "{0:c}", width: 110 },
+        { field: "UnitsInStock", title: "Units In Stock", width: 110 },
+        { field: "Discontinued", width: 110 },
+        { command: "destroy", title: "&nbsp;", width: 90 }
     ],
     dataSource: dataSource,
     filterable: true,
@@ -41,6 +44,6 @@ $("#grid").kendoGrid({
     editable: true,
 
     change: function(ev) {
-        console.log(this.dataSource.getByUid(this.select().attr(kendo.attr("uid"))));
+        window.item = this.dataSource.getByUid(this.select().attr(kendo.attr("uid")));
     }
 });

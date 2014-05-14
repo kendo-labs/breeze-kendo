@@ -82,12 +82,12 @@
         },
 
         _makeResults: function(data) {
-            var meta, typeObj, typeName;
+            var manager = this.manager;
 
             try {
-                meta = this.manager.metadataStore;
-                typeName = meta.getEntityTypeNameForResourceName(this.query.resourceName);
-                typeObj = meta.getEntityType(typeName);
+                var meta = manager.metadataStore;
+                var typeName = meta.getEntityTypeNameForResourceName(this.query.resourceName);
+                var typeObj = meta.getEntityType(typeName);
             } catch(ex) {
                 // without metadata Breeze returns plain JS objects
                 // so we can just return the original array.
@@ -95,9 +95,9 @@
                 return data.results;
             }
 
-            // with the metadata, some complex objects are returned,
-            // and ObservableArray will overrun the stack trying to
-            // walk it, so we must do the conversion ourselves.
+            // with the metadata, some complex objects are returned on
+            // which we can't call ObservableArray/Object (would
+            // overrun the stack).
 
             var props = typeObj.dataProperties;
             var a = data.results.map(function(rec){
@@ -106,63 +106,116 @@
                     obj[prop.name] = rec[prop.name];
                 });
                 obj = new kendo.data.ObservableObject(obj);
-                var locked = false;
-                function protect(f) {
-                    return function() {
-                        if (!locked) {
-                            locked = true;
-                            try { f.apply(this, arguments) }
-                            finally { locked = false }
-                        }
-                    };
-                }
-                obj.bind({
-                    "change": protect(function(ev){
-                        if (ev.field) {
-                            rec[ev.field] = obj[ev.field];
-                        } else {
-                            console.error("Unhandled ObservableObject->Breeze change event", ev);
-                        }
-                    }),
-                    "destroy": function(ev) {
-                        rec.entityAspect.setDeleted();
-                    }
-                });
-                rec.entityAspect.propertyChanged.subscribe(protect(function(ev){
-                    obj.set(ev.propertyName, ev.newValue);
-                }));
-                obj.__breezeEntity = rec;
+                syncItems(obj, rec);
                 return obj;
             });
 
             a = new kendo.data.ObservableArray(a);
             a.bind("change", function(ev){
-                console.log(ev);
+                //console.log(ev);
                 switch (ev.action) {
                   case "remove":
+                    ev.items.forEach(function(item){
+                        item.__breezeEntity.entityAspect.setDeleted();
+                    });
                     break;
                   case "add":
+                    ev.items.forEach(function(item){
+                        var entity = manager.createEntity(typeName, item);
+                        manager.addEntity(entity);
+                        syncItems(item, entity);
+                    });
                     break;
                 }
             });
             a.total = data.inlineCount;
             return a;
+        },
+
+        _makeSchema: function() {
+            var schema = {
+                total: function(data) {
+                    return data.total;
+                }
+            };
+            try {
+                var meta = this.manager.metadataStore;
+                var typeName = meta.getEntityTypeNameForResourceName(this.query.resourceName);
+                var typeObj = meta.getEntityType(typeName);
+            } catch(ex) {
+                return schema;
+            }
+            var model = { fields: {} };
+            if (typeObj.keyProperties) {
+                if (typeObj.keyProperties.length == 1) {
+                    model.id = typeObj.keyProperties[0].name;
+                } else if (typeObj.keyProperties.length > 1) {
+                    console.error("Multiple-key ID not supported");
+                }
+            }
+            typeObj.dataProperties.forEach(function(prop){
+                var type = "string";
+                if (prop.dataType.isNumeric) {
+                    type = "number";
+                }
+                else if (prop.dataType.isDate) {
+                    type = "date";
+                }
+                else if (prop.dataType.name == "Boolean") {
+                    type = "boolean";
+                }
+                model.fields[prop.name] = {
+                    type         : type,
+                    defaultValue : prop.defaultValue,
+                    nullable     : prop.isNullable,
+                };
+            });
+            //schema.model = model;
+            return schema;
         }
     });
 
     exports.Source = kendo.data.DataSource.extend({
         init: function(options) {
+            var transport = new BreezeTransport(options);
             options = $.extend({}, {
-                transport: new BreezeTransport(options),
-                schema: {
-                    total: function(data) {
-                        // XXX: wish this could be inserted from the transport.
-                        return data.total;
-                    }
-                }
+                transport : transport,
+                schema    : transport._makeSchema(),
+                batch     : true,
             }, options);
             kendo.data.DataSource.prototype.init.call(this, options);
         }
     });
+
+    function syncItems(observable, entity) {
+        var protect = Mutex();
+        observable.bind({
+            "change": protect(function(ev){
+                console.log(ev);
+                if (ev.field) {
+                    entity[ev.field] = observable[ev.field];
+                } else {
+                    console.error("Unhandled ObservableObject->Breeze change event", ev);
+                }
+            })
+        });
+        entity.entityAspect.propertyChanged.subscribe(protect(function(ev){
+            observable.set(ev.propertyName, ev.newValue);
+        }));
+        observable.__breezeEntity = entity;
+    }
+
+    function Mutex() {
+        var locked = false;
+        return function(f) {
+            return function() {
+                if (!locked) {
+                    locked = true;
+                    try { f.apply(this, arguments) }
+                    finally { locked = false }
+                }
+            };
+        };
+    }
 
 })(jQuery, kendo, breeze);
