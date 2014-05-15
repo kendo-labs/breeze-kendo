@@ -23,6 +23,13 @@ Open a new console.  To init the database:
 To run the test page, `node bin/server.js` in the breeze-kendo2 dir,
 and open http://localhost:3000/
 
+"Save changes" is broken in this demo, seems due to a bug in
+breeze-mongodb (watch the server console on "save").  The "save"
+server-side handler appears to expect the request to provide a
+metadata argument, but Breeze.js doesn't send it.  Any case, that's
+not a bug of our wrappers, I suspect with a better server side (Breeze
+seems to best support ASP.NET) it should work flawless.
+
 ## Features
 
 - creates a Kendo DataSource object that is kept in sync with the
@@ -32,10 +39,7 @@ and open http://localhost:3000/
 
   This means that for an app that is properly configured to use Breeze
   (i.e. has metadata and breezeManager.saveChanges() works) adding in
-  Kendo widgets should be a snap.
-
-  (XXX: create/update/destroy not yet completed in the transport, but
-  that's too easy; fighting with another bug right now.)
+  Kendo widgets that support a Kendo DataSource should be a snap.
 
 - auto-generates a Kendo-compatible data model (`schema.model`) based
   on metadata defined in the Breeze EntityManager.
