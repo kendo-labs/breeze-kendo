@@ -44,7 +44,7 @@
     $.extend(BreezeTransport.prototype, {
         read: function(options) {
             var self = this;
-            console.log("READ", options);
+            //console.log("READ", options);
             var query = self.query;
             var args = options.data;
             if (args.filter) {
@@ -72,14 +72,30 @@
             }
         },
         create: function(options) {
-            console.log("CREATE", options);
+            //console.log("CREATE", options);
+            this._saveChanges();
         },
         update: function(options) {
-            console.log("UPDATE", options);
+            //console.log("UPDATE", options);
+            this._saveChanges();
         },
         destroy: function(options) {
-            console.log("DESTROY", options);
+            //console.log("DESTROY", options);
+            this._saveChanges();
         },
+
+        _saveChanges: (function(){
+            // throttle, since we will get multiple calls even in
+            // "batch" mode.
+            var timer = null;
+            return function() {
+                var self = this;
+                clearTimeout(timer);
+                setTimeout(function(){
+                    self.manager.saveChanges();
+                }, 10);
+            };
+        })(),
 
         _makeResults: function(data) {
             var manager = this.manager;

@@ -12,9 +12,6 @@ metadataStore.importMetadata(window.METADATA);
 var manager = new breeze.EntityManager({
     dataService   : dataService,
     metadataStore : metadataStore,
-    // saveOptions   : new breeze.SaveOptions({
-    //     resourceName : "/SaveChanges"
-    // })
 });
 
 var dataSource = new kendo.data.breeze.Source({
