@@ -46,6 +46,61 @@ seems to best support ASP.NET) it should work flawless.
 
 - supports server-side pagination, sort, filters.
 
-The code is defined in `docroot/breeze-kendo.js`.
+## Usage
 
-See the usage in `docroot/test.js` and `docroot/index.html`.
+We assume your server is alredy configured for Breeze.js.
+
+The code is defined in `docroot/breeze-kendo.js`.  Load it after Kendo
+UI and Breeze:
+
+```html
+<script src=".../jquery.min.js"></script>
+<script src=".../kendo.all.min.js"></script>
+<script src=".../breeze.min.js"></script>
+<script src="breeze-kendo.js"></script>
+```
+
+It defines `kendo.data.breeze.Source`, an object which inherits from
+`kendo.data.DataSource` and can be used seamlessly with any widgets
+that support the [DataSource
+API](http://docs.telerik.com/kendo-ui/api/framework/datasource).  The
+Breeze-specific options are `manager` (must be a breeze.EntityManager)
+and `query` (a breeze.EntityQuery).  Example:
+
+```js
+var manager = new breeze.EntityManager(...);
+var query = breeze.EntityQuery.from("Products");
+var dataSource = new kendo.data.breeze.Source({
+  manager         : manager,
+  query           : query,
+  serverSorting   : true,
+  serverPaging    : true,
+  serverFiltering : true,
+  pageSize        : 10
+});
+```
+
+The query you specify should return a list of rows with your data.
+You can craft it any way you want, for example if you always want to
+discard some rows you can say:
+
+```js
+var query = breeze.EntityQuery.from("Products")
+                              .where("UnitPrice", "<", 10);
+```
+
+Now you can pass the `dataSource` to, say, a Grid widget:
+
+```js
+$("#grid").kendoGrid({
+  dataSource : dataSource,
+  filterable : true,
+  sortable   : true,
+  pageable   : true,
+  editable   : true,
+  toolbar    : ["create", "save", "cancel"]
+});
+```
+
+Now pagination, sorting, filtering and even saving is entirely handled
+by Breeze through our bindings.
