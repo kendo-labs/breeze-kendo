@@ -136,7 +136,7 @@
                     break;
                   case "add":
                     ev.items.forEach(function(item){
-                        var entity = manager.createEntity(typeName, item);
+                        var entity = manager.createEntity(typeName || this.query.resourceName, item);
                         manager.addEntity(entity);
                         syncItems(item, entity);
                     });
