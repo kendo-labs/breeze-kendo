@@ -103,7 +103,7 @@
             try {
                 var meta = manager.metadataStore;
                 var typeName = meta.getEntityTypeNameForResourceName(this.query.resourceName);
-                var typeObj = meta.getEntityType(typeName);
+                var typeObj = meta.getEntityType(typeName || this.query.resourceName);
             } catch(ex) {
                 // without metadata Breeze returns plain JS objects
                 // so we can just return the original array.
@@ -156,7 +156,7 @@
             try {
                 var meta = this.manager.metadataStore;
                 var typeName = meta.getEntityTypeNameForResourceName(this.query.resourceName);
-                var typeObj = meta.getEntityType(typeName);
+                var typeObj = meta.getEntityType(typeName || this.query.resourceName);
             } catch(ex) {
                 return schema;
             }
@@ -168,6 +168,7 @@
                     console.error("Multiple-key ID not supported");
                 }
             }
+            
             typeObj.dataProperties.forEach(function(prop){
                 var type = "string";
                 if (prop.dataType.isNumeric) {
@@ -185,6 +186,7 @@
                     nullable     : prop.isNullable,
                 };
             });
+			
             schema.model = model;
             return schema;
         }
