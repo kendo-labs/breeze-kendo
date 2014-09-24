@@ -99,11 +99,12 @@
 
         _makeResults: function(data) {
             var manager = this.manager;
+            var query = this.query;
 
             try {
                 var meta = manager.metadataStore;
-                var typeName = meta.getEntityTypeNameForResourceName(this.query.resourceName);
-                var typeObj = meta.getEntityType(typeName || this.query.resourceName);
+                var typeName = meta.getEntityTypeNameForResourceName(query.resourceName);
+                var typeObj = meta.getEntityType(typeName || query.resourceName);
             } catch(ex) {
                 // without metadata Breeze returns plain JS objects
                 // so we can just return the original array.
@@ -136,7 +137,7 @@
                     break;
                   case "add":
                     ev.items.forEach(function(item){
-                        var entity = manager.createEntity(typeName, item);
+                        var entity = manager.createEntity(typeName || query.resourceName, item);
                         manager.addEntity(entity);
                         syncItems(item, entity);
                     });
@@ -169,24 +170,29 @@
                 }
             }
             
-            typeObj.dataProperties.forEach(function(prop){
-                var type = "string";
-                if (prop.dataType.isNumeric) {
-                    type = "number";
-                }
-                else if (prop.dataType.isDate) {
-                    type = "date";
-                }
-                else if (prop.dataType.name == "Boolean") {
-                    type = "boolean";
-                }
-                model.fields[prop.name] = {
-                    type         : type,
-                    defaultValue : prop.defaultValue,
-                    nullable     : prop.isNullable,
-                };
-            });
-			
+            try {
+                typeObj.dataProperties.forEach(function(prop){
+                    var proptype = "string";
+                    if (prop.dataType.isNumeric) {
+                        proptype = "number";
+                    }
+                    else if (prop.dataType.isDate) {
+                        proptype = "date";
+                    }
+                    else if (prop.dataType.name == "Boolean") {
+                        proptype = "boolean";
+                    }
+                    model.fields[prop.name] = {
+                        type: proptype,
+                        defaultValue : prop.defaultValue,
+                        nullable:      prop.isNullable,
+                        required:      prop.isNullable
+                    };
+                });
+            } catch (ex) {
+                return schema;
+            }
+
             schema.model = model;
             return schema;
         }
