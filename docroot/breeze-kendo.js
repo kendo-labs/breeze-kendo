@@ -117,11 +117,29 @@
             // overrun the stack).
 
             var props = typeObj.dataProperties;
+            var navs = typeObj.navigationProperties;
             var a = data.results.map(function(rec){
                 var obj = {};
                 props.forEach(function(prop){
                     obj[prop.name] = rec[prop.name];
                 });
+
+                // handle nav properties - only allows 1 level currently
+                navs.forEach(function(nav) {
+                    var navProps = nav.entityType.dataProperties;
+                    
+                    if (!!rec[nav.name]) {
+                        var navObj = {};
+                        var navRec = rec[nav.name];
+
+                        navProps.forEach(function (navProp) {
+                            navObj[navProp.name] = navRec[navProp.name];
+                        });
+
+                        obj[nav.name] = navObj;
+                    }
+                });
+
                 obj = new kendo.data.Model(obj);
                 syncItems(obj, rec);
                 return obj;
@@ -189,6 +207,23 @@
                         required:      prop.isNullable
                     };
                 });
+                
+                var navs = typeObj.navigationProperties;
+
+                navs.forEach(function(nav) {
+                    var navProps = nav.entityType.dataProperties;
+
+                    /* TODO: Figure out how to map complex properties for the schema...
+                    
+                        Out of the box, Kendo DataSource does not support this in it's schema
+                        An option includes potentially turning all related properties into
+                        Nav_Property instead of Nav.Property, but this would require
+                        Changes to the entirety of the transport to override mapping both
+                        forward and back.
+                    */
+                });
+
+
             } catch (ex) {
                 return schema;
             }
