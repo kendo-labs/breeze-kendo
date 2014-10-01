@@ -14,6 +14,18 @@
         this.manager = options.manager;
         this.query = options.query;
     }
+	
+	function recursiveIteration(object, callback, prefix) {
+        for (var property in object) {
+            if (object.hasOwnProperty(property)) {
+                if (typeof object[property] == "object") {
+                    recursiveIteration(object[property], callback, (prefix || '') + property + '.');
+                } else {
+                    callback(object, (prefix || '') + property);
+                }
+            }
+        }
+    }
 
     function makeOperator(op) {
         return {
@@ -68,7 +80,7 @@
                     options.error(err);
                 });
             } catch(ex) {
-                console.error(ex);
+                console && console.error && console.error(ex);
             }
         },
         create: function(options) {
@@ -97,13 +109,23 @@
             };
         })(),
 
+        _cancelChanges: function (dataItem) {
+            var manager = this.manager;
+            if (dataItem && dataItem.__breezeEntity) {
+                dataItem.__breezeEntity.rejectChanges();
+            } else {
+                manager.rejectChanges();
+            }
+        },
+
         _makeResults: function(data) {
             var manager = this.manager;
+            var query = this.query;
 
             try {
                 var meta = manager.metadataStore;
-                var typeName = meta.getEntityTypeNameForResourceName(this.query.resourceName);
-                var typeObj = meta.getEntityType(typeName);
+                var typeName = meta.getEntityTypeNameForResourceName(query.resourceName);
+                var typeObj = meta.getEntityType(typeName || query.resourceName);
             } catch(ex) {
                 // without metadata Breeze returns plain JS objects
                 // so we can just return the original array.
@@ -111,17 +133,47 @@
                 return data.results;
             }
 
+            // let's get (or try to get) the schema
+            // and create a correct model, so that things like
+            // isNew() work
+            var schema = this._makeSchema();
+
             // with the metadata, some complex objects are returned on
             // which we can't call ObservableArray/Object (would
             // overrun the stack).
 
             var props = typeObj.dataProperties;
+            var navs = typeObj.navigationProperties;
             var a = data.results.map(function(rec){
                 var obj = {};
                 props.forEach(function(prop){
                     obj[prop.name] = rec[prop.name];
                 });
-                obj = new kendo.data.Model(obj);
+
+                // handle nav properties - only allows 1 level currently
+                navs.forEach(function(nav) {
+                    var navProps = nav.entityType.dataProperties;
+                    
+                    if (!!rec[nav.name]) {
+                        var navObj = {};
+                        var navRec = rec[nav.name];
+
+                        navProps.forEach(function (navProp) {
+                            navObj[navProp.name] = navRec[navProp.name];
+                        });
+
+                        obj[nav.name] = navObj;
+                    }
+                });
+
+                // bind to the schema if available
+                if (schema && schema.model) {
+                    var schemaModel = kendo.data.Model.define(schema.model);
+                    obj = new schemaModel(obj);
+                } else {
+                    obj = new kendo.data.Model(obj);
+                }
+
                 syncItems(obj, rec);
                 return obj;
             });
@@ -136,7 +188,7 @@
                     break;
                   case "add":
                     ev.items.forEach(function(item){
-                        var entity = manager.createEntity(typeName, item);
+                        var entity = manager.createEntity(typeName || query.resourceName, item);
                         manager.addEntity(entity);
                         syncItems(item, entity);
                     });
@@ -156,7 +208,7 @@
             try {
                 var meta = this.manager.metadataStore;
                 var typeName = meta.getEntityTypeNameForResourceName(this.query.resourceName);
-                var typeObj = meta.getEntityType(typeName);
+                var typeObj = meta.getEntityType(typeName || this.query.resourceName);
             } catch(ex) {
                 return schema;
             }
@@ -165,26 +217,50 @@
                 if (typeObj.keyProperties.length == 1) {
                     model.id = typeObj.keyProperties[0].name;
                 } else if (typeObj.keyProperties.length > 1) {
-                    console.error("Multiple-key ID not supported");
+                    console && console.error && console.error("Multiple-key ID not supported");
                 }
             }
-            typeObj.dataProperties.forEach(function(prop){
-                var type = "string";
-                if (prop.dataType.isNumeric) {
-                    type = "number";
-                }
-                else if (prop.dataType.isDate) {
-                    type = "date";
-                }
-                else if (prop.dataType.name == "Boolean") {
-                    type = "boolean";
-                }
-                model.fields[prop.name] = {
-                    type         : type,
-                    defaultValue : prop.defaultValue,
-                    nullable     : prop.isNullable,
-                };
-            });
+            
+            try {
+                typeObj.dataProperties.forEach(function(prop){
+                    var proptype = "string";
+                    if (prop.dataType.isNumeric) {
+                        proptype = "number";
+                    }
+                    else if (prop.dataType.isDate) {
+                        proptype = "date";
+                    }
+                    else if (prop.dataType.name == "Boolean") {
+                        proptype = "boolean";
+                    }
+                    model.fields[prop.name] = {
+                        type: proptype,
+                        defaultValue : prop.defaultValue,
+                        nullable:      prop.isNullable,
+                        required:      prop.isNullable
+                    };
+                });
+                
+                var navs = typeObj.navigationProperties;
+
+                navs.forEach(function(nav) {
+                    var navProps = nav.entityType.dataProperties;
+
+                    /* TODO: Figure out how to map complex properties for the schema...
+                    
+                        Out of the box, Kendo DataSource does not support this in it's schema
+                        An option includes potentially turning all related properties into
+                        Nav_Property instead of Nav.Property, but this would require
+                        Changes to the entirety of the transport to override mapping both
+                        forward and back.
+                    */
+                });
+
+
+            } catch (ex) {
+                return schema;
+            }
+
             schema.model = model;
             return schema;
         }
@@ -199,7 +275,23 @@
                 batch     : true,
             }, options);
             kendo.data.DataSource.prototype.init.call(this, options);
-        }
+
+        },
+        cancelChanges: function (e) {
+            var t = this;
+
+            if (e instanceof kendo.data.Model) {
+                t._cancelModel(e);
+                t.transport._cancelChanges(e);
+            } else {
+                t._destroyed = [],
+                t._detachObservableParents(),
+                t._data = t._observe(t._pristineData),
+                t.options.serverPaging && (t._total = t._pristineTotal);
+                t._change();
+                t.transport._cancelChanges();
+            }
+        },
     });
 
     function syncItems(observable, entity) {
@@ -209,12 +301,19 @@
                 if (ev.field) {
                     entity[ev.field] = observable[ev.field];
                 } else {
-                    console.error("Unhandled ObservableObject->Breeze change event", ev);
+                    console && console.error && console.error("Unhandled ObservableObject->Breeze change event", ev);
                 }
             })
         });
-        entity.entityAspect.propertyChanged.subscribe(protect(function(ev){
-            observable.set(ev.propertyName, ev.newValue);
+        entity.entityAspect.propertyChanged.subscribe(protect(function (ev) {
+
+            if (ev.propertyName) {
+                observable.set(ev.propertyName, ev.newValue);
+            } else if (ev.entity) {
+                recursiveIteration(ev.entity._backingStore, function(obj, prop) {
+                    observable.set(prop, obj[prop]);
+                });
+            }
         }));
         observable.__breezeEntity = entity;
     }
