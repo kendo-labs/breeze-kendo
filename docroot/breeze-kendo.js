@@ -70,9 +70,6 @@
                         options.error(err);
                     }
                 );
-                }).fail(function(err){
-                    options.error(err);
-                });
             } catch(ex) {
                 console.error(ex);
             }
