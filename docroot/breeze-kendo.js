@@ -62,11 +62,14 @@
                     .inlineCount();
             }
             try {
-                self.manager.executeQuery(query).then(function(data){
-                    options.success(self._makeResults(data));
-                }).fail(function(err){
-                    options.error(err);
-                });
+                 self.manager.executeQuery(query,
+                    function (data) {
+                        options.success(self._makeResults(data));
+                    },
+                    function (err) {
+                        options.error(err);
+                    }
+                );
             } catch(ex) {
                 console.error(ex);
             }
