@@ -4,7 +4,7 @@
     var Predicate = breeze.Predicate;
     var Operators = breeze.FilterQueryOp;
 
-    function BreezeTransport(options) {
+    function BreezeTransport(options, kendoModelType) {
         if (!options.manager) {
             throw new Error("Please specify a Breeze EntityManager via `manager` option");
         }
@@ -13,6 +13,7 @@
         }
         this.manager = options.manager;
         this.query = options.query;
+        this.kendoModelType = kendoModelType;
     }
 
     function makeOperator(op) {
@@ -99,6 +100,7 @@
 
         _makeResults: function(data) {
             var manager = this.manager;
+            var kendoModelType = this.kendoModelType;
 
             try {
                 var meta = manager.metadataStore;
@@ -114,14 +116,14 @@
             // with the metadata, some complex objects are returned on
             // which we can't call ObservableArray/Object (would
             // overrun the stack).
-
             var props = typeObj.dataProperties;
             var a = data.results.map(function(rec){
                 var obj = {};
                 props.forEach(function(prop){
                     obj[prop.name] = rec[prop.name];
                 });
-                obj = new kendo.data.Model(obj);
+                //obj = new kendo.data.Model(obj);
+                obj = new kendoModelType(obj);
                 syncItems(obj, rec);
                 return obj;
             });
@@ -192,13 +194,25 @@
 
     exports.Source = kendo.data.DataSource.extend({
         init: function(options) {
-            var transport = new BreezeTransport(options);
+            var transport = new BreezeTransport(options, kendo.data.Model);
             options = $.extend({}, {
-                transport : transport,
-                schema    : transport._makeSchema(),
-                batch     : true,
+                transport: transport,
+                schema: transport._makeSchema(),
+                batch: true
             }, options);
             kendo.data.DataSource.prototype.init.call(this, options);
+        }
+    });
+
+    exports.SchedulerSource = kendo.data.SchedulerDataSource.extend({
+        init: function (options) {
+            var transport = new BreezeTransport(options, kendo.data.SchedulerEvent);
+            options = $.extend({}, {
+                transport: transport,
+                schema: transport._makeSchema(),
+                batch: true
+            }, options);
+            kendo.data.SchedulerDataSource.prototype.init.call(this, options);
         }
     });
 
