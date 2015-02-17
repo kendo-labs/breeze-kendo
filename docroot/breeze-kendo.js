@@ -79,7 +79,9 @@
                     }
                 ).catch(
                     function (error) {
-                        options.error(error.httpResponse);
+                        options.error(
+                            error.httpResponse,
+                            error.statusText || (error.innerError && error.innerError.statusText));
                     }
                 );
         },
@@ -91,7 +93,9 @@
                     }
                 ).catch(
                     function (error) {
-                        options.error(error.httpResponse);
+                        options.error(
+                            error.httpResponse,
+                            error.statusText || (error.innerError && error.innerError.statusText));
                     }
                 );
         },
@@ -103,7 +107,9 @@
                     }
                 ).catch(
                     function (error) {
-                        options.error(error.httpResponse);
+                        options.error(
+                            error.httpResponse,
+                            error.statusText || (error.innerError && error.innerError.statusText));
                     }
                 );
         },
